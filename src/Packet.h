@@ -1,4 +1,4 @@
-// Packet.h - UPDATED for Week 3
+ // Packet.h - UPDATED for Week 4
 #pragma once
 #include <string>
 #include <vector>
@@ -7,6 +7,7 @@ enum PacketState { MOVING, ALLOWED, BLOCKED, RATE_LIMITED, DONE };
 
 struct Packet {
     int id = 0;                // unique id (shown in the inspector)
+    int attackType = 0;        // Week 4: AttackType value (0 = normal), used for the summary
 
     // header info
     std::string srcIP, dstIP;

@@ -1,7 +1,8 @@
-// Network.h - UPDATED for Week 3
+// Network.h - UPDATED for Week 4
 #pragma once
 #include <vector>
 #include <utility>
+#include <string>
 #include "Node.h"
 #include "Packet.h"
 #include "Firewall.h"
@@ -29,6 +30,12 @@ public:
     int blockedCount = 0;
     int rateLimitedCount = 0;
 
+    // Week 4: statistics for the summary screen
+    int ruleHits[7]    = {0};   // how many times R1..R7 decided a packet
+    int atkSeen[7]     = {0};   // attack packets per AttackType (index 1..6)
+    int atkBlocked[7]  = {0};
+    int atkLimited[7]  = {0};
+
     // Week 3: packet inspector (click a packet to select it)
     int    nextId = 1;
     bool   hasSelected = false;   // something is selected
@@ -52,6 +59,9 @@ public:
 
     void selectAt(float x, float y);   // click on the simulation area
     void toggleRule(int index);        // enable / disable R1..R6 at runtime
+
+    bool saveLog(const std::string& path);   // Week 4: summary + all events -> text file
+    int  mostTriggeredRule() const;          // index 0..5 (R7 ignored), or -1 if no rule fired
 
 private:
     void drawNode(const Node& n) const;

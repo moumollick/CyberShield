@@ -1,4 +1,4 @@
-// main.cpp - UPDATED for Week 3
+// main.cpp - UPDATED for Week 4
 #include <GL/freeglut.h>
 #include <cstdlib>
 #include <ctime>
@@ -12,6 +12,7 @@ const int WIN_W = 1280, WIN_H = 700;
 Network net;
 AttackGenerator attack;
 bool paused = false;
+bool showSummary = false;
 float speedMul = 1.0f;
 int lastTime = 0;
 
@@ -26,15 +27,21 @@ void display() {
     drawGrid();
     net.draw();
     Dashboard::draw(net, attack);
+    if (showSummary) Dashboard::drawSummary(net);
 
     Renderer::setColor(1, 1, 1);
     Renderer::drawText(10, WIN_H - 20,
         "N: normal | 1 Flood  2 PortScan  3 Malware  4 Brute  5 Oversize  6 Blacklist | Space: pause  +/-: speed  R: reset  Esc: exit");
     Renderer::drawText(10, WIN_H - 40,
         "Click packet: inspect | Click rule or F1-F7: toggle rule | R: reset + reload config");
+    Renderer::drawText(10, WIN_H - 60, "D: auto demo | S: summary | L: save log to logs/events.txt");
+    if (attack.demoActive) {
+        Renderer::setColor(0.5f, 0.9f, 1.0f);
+        Renderer::drawText(10, WIN_H - 80, "DEMO RUNNING");
+    }
     if (paused) {
         Renderer::setColor(1, 0.8f, 0.1f);
-        Renderer::drawText(10, WIN_H - 60, "PAUSED");
+        Renderer::drawText(10, WIN_H - 100, "PAUSED");
     }
     glutSwapBuffers();
 }
@@ -48,6 +55,11 @@ void timer(int) {
     if (!paused) {
         attack.update(dt * speedMul, net);
         net.update(dt * speedMul);
+    }
+    if (attack.demoFinished) {          // demo ended: show summary and save the log
+        attack.demoFinished = false;
+        showSummary = true;
+        net.saveLog("logs/events.txt");
     }
     glutPostRedisplay();
     glutTimerFunc(16, timer, 0);
@@ -65,8 +77,14 @@ void keyboard(unsigned char key, int, int) {
         case ' ': paused = !paused; break;
         case '+': case '=': speedMul *= 1.25f; break;
         case '-': case '_': speedMul /= 1.25f; break;
-        case 'r': case 'R': net.reset(); attack.reset(); break;
-        case 27: exit(0);
+        case 'r': case 'R': net.reset(); attack.reset(); showSummary = false; break;
+        case 'd': case 'D': net.reset(); attack.reset(); showSummary = false; attack.startDemo(net); break;
+        case 's': case 'S': showSummary = !showSummary; break;
+        case 'l': case 'L':
+            net.log.add(net.saveLog("logs/events.txt") ? "Log saved: logs/events.txt" : "ERROR: could not save log",
+                        0.6f, 0.8f, 1.0f);
+            break;
+        case 27: net.saveLog("logs/events.txt"); exit(0);
     }
 }
 

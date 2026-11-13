@@ -1,4 +1,4 @@
-// Dashboard.h
+ // Dashboard.h
 // Right-side panel: status, counters, rule list, event log.
 // Panel position is set by constants at the top of Dashboard.cpp (window is 1280 x 700).
 #pragma once
@@ -7,6 +7,9 @@
 
 namespace Dashboard {
     void draw(const Network& net, const AttackGenerator& atk);
+
+    // Week 4: full-screen summary (press S)
+    void drawSummary(const Network& net);
 
     // Week 3
     bool inPanel(int mx);                  // is the click inside the right-side panel?

@@ -1,4 +1,4 @@
-// Network.cpp - UPDATED for Week 3
+// Network.cpp - UPDATED for Week 4
 #include "Network.h"
 #include "Renderer.h"
 #include <cmath>
@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <string>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 
 void Network::init() {
     nodes.clear();
@@ -17,6 +19,7 @@ void Network::init() {
     nextId = 1;
     hasSelected = selectedGone = false;
 
+    for (int i = 0; i < 7; i++) ruleHits[i] = atkSeen[i] = atkBlocked[i] = atkLimited[i] = 0;
     totalPackets = allowedCount = blockedCount = rateLimitedCount = 0;
     simTime = 0;
     threatLevel = 0;
@@ -110,6 +113,14 @@ void Network::onReachFirewall(Packet& p) {
     p.matchedRule = d.ruleId;
     p.threat = d.threat;
     totalPackets++;
+
+    // Week 4: statistics
+    if (d.ruleId.size() == 2 && d.ruleId[1] >= '1' && d.ruleId[1] <= '7') ruleHits[d.ruleId[1] - '1']++;
+    if (p.isAttack && p.attackType >= 1 && p.attackType <= 6) {
+        atkSeen[p.attackType]++;
+        if (d.action == ACT_BLOCK)      atkBlocked[p.attackType]++;
+        if (d.action == ACT_RATE_LIMIT) atkLimited[p.attackType]++;
+    }
 
     const char* word = "ALLOW";
     float r = 0.3f, g = 1.0f, b = 0.4f;
@@ -250,4 +261,50 @@ void Network::draw() const {
         Renderer::setColor(1, 1, 1);
         Renderer::circleMidpoint((int)selected.x, (int)selected.y, 14);
     }
+}
+
+int Network::mostTriggeredRule() const {
+    int best = -1, bestN = 0;
+    for (int i = 0; i < 6; i++)            // R7 (normal traffic) is not interesting
+        if (ruleHits[i] > bestN) { bestN = ruleHits[i]; best = i; }
+    return best;
+}
+
+// Week 4: write a report file (statistics + full event log)
+bool Network::saveLog(const std::string& path) {
+    std::filesystem::path p(path);
+    if (p.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(p.parent_path(), ec);
+    }
+    std::ofstream out(path);
+    if (!out) return false;
+
+    static const char* atkNames[7] = {"-", "Flood / DDoS", "Port scan", "Malware signature",
+                                      "Brute-force login", "Oversized packets", "Blacklisted host"};
+
+    out << "CyberShield event log\n";
+    out << "Simulation time: " << simTime << " s\n\n";
+    out << "== Totals ==\n";
+    out << "Inspected    : " << totalPackets << "\n";
+    out << "Allowed      : " << allowedCount << "\n";
+    out << "Blocked      : " << blockedCount << "\n";
+    out << "Rate-limited : " << rateLimitedCount << "\n\n";
+
+    out << "== Rule hits ==\n";
+    for (int i = 0; i < 7; i++)
+        out << firewall.rules[i].id << " (" << (firewall.rules[i].enabled ? "ON" : "OFF") << ") "
+            << firewall.rules[i].description << " : " << ruleHits[i] << "\n";
+
+    out << "\n== Attacks ==\n";
+    for (int t = 1; t <= 6; t++) {
+        if (atkSeen[t] == 0) continue;
+        int passed = atkSeen[t] - atkBlocked[t] - atkLimited[t];
+        out << atkNames[t] << " : seen " << atkSeen[t] << ", blocked " << atkBlocked[t]
+            << ", rate-limited " << atkLimited[t] << ", passed " << passed << "\n";
+    }
+
+    out << "\n== Events ==\n";
+    for (const auto& line : log.history) out << line << "\n";
+    return true;
 }

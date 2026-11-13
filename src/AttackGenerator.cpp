@@ -1,4 +1,4 @@
-// AttackGenerator.cpp
+ // AttackGenerator.cpp
 #include "AttackGenerator.h"
 #include "Network.h"
 #include <cstdio>
@@ -41,6 +41,7 @@ void AttackGenerator::spawnOne(Network& net) {
     int dest = (current == ATK_BRUTE) ? Network::INTERNAL_IDX : Network::DMZ_IDX;
     Packet p = net.createPacket(src, dest);
     p.isAttack = true;
+    p.attackType = (int)current;
 
     switch (current) {
         case ATK_FLOOD:
@@ -75,7 +76,43 @@ void AttackGenerator::spawnOne(Network& net) {
     net.spawnPacket(p);
 }
 
+// Week 4: demo = background normal traffic + one attack after another
+namespace {
+    struct DemoStep { float time; AttackType type; };
+    const DemoStep DEMO[] = {
+        {2.0f,  ATK_FLOOD},   {8.0f,  ATK_PORTSCAN}, {13.0f, ATK_MALWARE},
+        {18.0f, ATK_BRUTE},   {23.0f, ATK_OVERSIZE}, {27.0f, ATK_BLACKLIST},
+    };
+    const int   DEMO_STEPS = 6;
+    const float DEMO_END   = 33.0f;
+}
+
+void AttackGenerator::startDemo(Network& net) {
+    demoActive = true;
+    demoFinished = false;
+    demoTime = 0;
+    demoNormalTimer = 0;
+    demoStep = 0;
+    net.log.add("DEMO started", 0.7f, 0.9f, 1.0f);
+}
+
 void AttackGenerator::update(float dt, Network& net) {
+    if (demoActive) {
+        demoTime += dt;
+        demoNormalTimer -= dt;
+        if (demoNormalTimer <= 0) { net.sendNormalPacket(); demoNormalTimer = 0.6f; }
+
+        if (demoStep < DEMO_STEPS && demoTime >= DEMO[demoStep].time) {
+            start(DEMO[demoStep].type, net);
+            demoStep++;
+        }
+        if (demoTime >= DEMO_END && !active()) {
+            demoActive = false;
+            demoFinished = true;
+            net.log.add("DEMO finished", 0.7f, 0.9f, 1.0f);
+        }
+    }
+
     if (!active()) return;
     timer -= dt;
     while (timer <= 0 && remaining > 0) {

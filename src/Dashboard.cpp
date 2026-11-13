@@ -1,4 +1,4 @@
-// Dashboard.cpp
+ // Dashboard.cpp
 #include "Dashboard.h"
 #include "Renderer.h"
 #include <cstdio>
@@ -146,4 +146,62 @@ int Dashboard::ruleAt(int mx, int myGL) {
         if (myGL >= rowY - 5 && myGL <= rowY + 11) return i;
     }
     return -1;
+}
+
+// Week 4: summary overlay
+void Dashboard::drawSummary(const Network& net) {
+    const int cx = 450, cy = 350, hw = 330, hh = 260;
+    Renderer::setColor(0.05f, 0.06f, 0.10f);
+    Renderer::rectFilled(cx, cy, hw, hh);
+    Renderer::setColor(0.4f, 0.5f, 0.8f);
+    Renderer::rectOutline(cx, cy, hw, hh);
+
+    float x = cx - hw + 20;
+    float y = cy + hh - 28;
+    char buf[160];
+
+    text(x, y, 1, 1, 1, "SIMULATION SUMMARY   (S: close, L: save log)");
+    y -= 28;
+
+    int stopped = net.blockedCount + net.rateLimitedCount;
+    float pct = net.totalPackets > 0 ? 100.0f * stopped / net.totalPackets : 0.0f;
+    std::snprintf(buf, sizeof(buf), "Inspected %d   Allowed %d   Blocked %d   Rate-limited %d",
+                  net.totalPackets, net.allowedCount, net.blockedCount, net.rateLimitedCount);
+    text(x, y, 0.8f, 0.9f, 1, buf);  y -= 17;
+    std::snprintf(buf, sizeof(buf), "Stopped or throttled: %.0f%% of all packets   (time %.0f s)", pct, net.simTime);
+    text(x, y, 0.8f, 0.9f, 1, buf);  y -= 28;
+
+    text(x, y, 1, 1, 1, "RULE HITS");  y -= 17;
+    for (int i = 0; i < 7; i++) {
+        const Rule& r = net.firewall.rules[i];
+        std::snprintf(buf, sizeof(buf), "%s %-3s %-30s %d", r.id.c_str(), r.enabled ? "ON" : "OFF",
+                      r.description.c_str(), net.ruleHits[i]);
+        if (r.enabled) text(x, y, 0.75f, 0.85f, 1.0f, buf);
+        else           text(x, y, 0.45f, 0.45f, 0.45f, buf);
+        y -= 16;
+    }
+    y -= 12;
+
+    text(x, y, 1, 1, 1, "ATTACKS");  y -= 17;
+    bool any = false;
+    for (int t = 1; t <= 6; t++) {
+        if (net.atkSeen[t] == 0) continue;
+        any = true;
+        int passed = net.atkSeen[t] - net.atkBlocked[t] - net.atkLimited[t];
+        std::snprintf(buf, sizeof(buf), "%-18s seen %-3d blocked %-3d limited %-3d passed %d",
+                      AttackGenerator::name((AttackType)t), net.atkSeen[t], net.atkBlocked[t],
+                      net.atkLimited[t], passed);
+        text(x, y, passed > 0 ? 1.0f : 0.4f, passed > 0 ? 0.7f : 1.0f, passed > 0 ? 0.2f : 0.5f, buf);
+        y -= 16;
+    }
+    if (!any) { text(x, y, 0.6f, 0.6f, 0.6f, "No attacks yet (press D for the demo)"); y -= 16; }
+    y -= 12;
+
+    int best = net.mostTriggeredRule();
+    if (best >= 0) {
+        std::snprintf(buf, sizeof(buf), "Most triggered rule: %s - %s (%d hits)",
+                      net.firewall.rules[best].id.c_str(), net.firewall.rules[best].description.c_str(),
+                      net.ruleHits[best]);
+        text(x, y, 1, 0.8f, 0.2f, buf);
+    }
 }
