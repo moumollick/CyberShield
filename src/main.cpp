@@ -1,4 +1,4 @@
-// main.cpp - UPDATED for Week 4
+// main.cpp - UPDATED for Week 5
 #include <GL/freeglut.h>
 #include <cstdlib>
 #include <ctime>
@@ -27,6 +27,7 @@ void display() {
     drawGrid();
     net.draw();
     Dashboard::draw(net, attack);
+    Dashboard::drawOverlay(net);
     if (showSummary) Dashboard::drawSummary(net);
 
     Renderer::setColor(1, 1, 1);
@@ -34,7 +35,7 @@ void display() {
         "N: normal | 1 Flood  2 PortScan  3 Malware  4 Brute  5 Oversize  6 Blacklist | Space: pause  +/-: speed  R: reset  Esc: exit");
     Renderer::drawText(10, WIN_H - 40,
         "Click packet: inspect | Click rule or F1-F7: toggle rule | R: reset + reload config");
-    Renderer::drawText(10, WIN_H - 60, "D: auto demo | S: summary | L: save log to logs/events.txt");
+    Renderer::drawText(10, WIN_H - 60, "D: auto demo | S: summary | L: save log | Arrows: edit limits");
     if (attack.demoActive) {
         Renderer::setColor(0.5f, 0.9f, 1.0f);
         Renderer::drawText(10, WIN_H - 80, "DEMO RUNNING");
@@ -103,6 +104,10 @@ void mouse(int button, int state, int mx, int my) {
 // Week 3: F1..F7 toggle R1..R7
 void special(int key, int, int) {
     if (key >= GLUT_KEY_F1 && key <= GLUT_KEY_F7) net.toggleRule(key - GLUT_KEY_F1);
+    if (key == GLUT_KEY_UP)    net.editMove(-1);      // Week 5: limit editor
+    if (key == GLUT_KEY_DOWN)  net.editMove(+1);
+    if (key == GLUT_KEY_LEFT)  net.editChange(-1);
+    if (key == GLUT_KEY_RIGHT) net.editChange(+1);
 }
 
 int main(int argc, char** argv) {

@@ -1,4 +1,4 @@
-// Network.h - UPDATED for Week 4
+// Network.h - UPDATED for Week 5
 #pragma once
 #include <vector>
 #include <utility>
@@ -7,8 +7,13 @@
 #include "Packet.h"
 #include "Firewall.h"
 #include "Logger.h"
+#include "IDS.h"
 
 enum SecurityStatus { STATUS_SAFE, STATUS_WARNING, STATUS_CRITICAL };
+
+// Week 5: popup alert (IDS) and block animation
+struct Alert  { std::string text; float timeLeft; };
+struct Effect { float x, y, t; };
 
 class Network {
 public:
@@ -29,6 +34,13 @@ public:
     int allowedCount = 0;
     int blockedCount = 0;
     int rateLimitedCount = 0;
+
+    // Week 5
+    IDS ids;
+    std::vector<Alert>  alerts;      // popups shown on screen (max 3)
+    std::vector<Effect> effects;     // expanding rings where packets get blocked
+    int alertCount = 0;
+    int editParam = 0;               // selected limit in the limit editor
 
     // Week 4: statistics for the summary screen
     int ruleHits[7]    = {0};   // how many times R1..R7 decided a packet
@@ -59,6 +71,10 @@ public:
 
     void selectAt(float x, float y);   // click on the simulation area
     void toggleRule(int index);        // enable / disable R1..R6 at runtime
+
+    void editMove(int d) { editParam = (editParam + d + Firewall::PARAM_COUNT) % Firewall::PARAM_COUNT; }
+    void editChange(int dir);          // change the selected limit (arrow keys)
+    void raiseAlert(const std::string& text);
 
     bool saveLog(const std::string& path);   // Week 4: summary + all events -> text file
     int  mostTriggeredRule() const;          // index 0..5 (R7 ignored), or -1 if no rule fired

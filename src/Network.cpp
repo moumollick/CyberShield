@@ -1,4 +1,4 @@
-// Network.cpp - UPDATED for Week 4
+// Network.cpp - UPDATED for Week 5
 #include "Network.h"
 #include "Renderer.h"
 #include <cmath>
@@ -17,6 +17,11 @@ void Network::init() {
     firewall.init();
     configLoaded = firewall.loadConfig("config/firewall.cfg");   // run the exe from the project folder
     nextId = 1;
+    ids.reset();
+    alerts.clear();
+    effects.clear();
+    alertCount = 0;
+    editParam = 0;
     hasSelected = selectedGone = false;
 
     for (int i = 0; i < 7; i++) ruleHits[i] = atkSeen[i] = atkBlocked[i] = atkLimited[i] = 0;
@@ -85,6 +90,21 @@ void Network::selectAt(float x, float y) {
     }
 }
 
+void Network::raiseAlert(const std::string& text) {
+    alerts.push_back({text, 5.0f});
+    if (alerts.size() > 3) alerts.erase(alerts.begin());
+    alertCount++;
+    log.add("IDS ALERT: " + text, 1.0f, 0.4f, 1.0f);
+}
+
+void Network::editChange(int dir) {
+    firewall.paramAdjust(editParam, dir);
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "LIMIT %s = %s", firewall.paramName(editParam),
+                  firewall.paramText(editParam).c_str());
+    log.add(buf, 0.6f, 0.8f, 1.0f);
+}
+
 void Network::toggleRule(int i) {
     if (i < 0 || i >= 6) return;          // R7 (default allow) cannot be switched off
     Rule& r = firewall.rules[i];
@@ -114,6 +134,13 @@ void Network::onReachFirewall(Packet& p) {
     p.threat = d.threat;
     totalPackets++;
 
+    // Week 5: IDS looks at the packet (pattern detection)
+    {
+        std::string alertText;
+        std::string srcName = p.path.empty() ? p.srcIP : nodes[p.path[0]].name;
+        if (ids.observe(p, d, simTime, srcName, alertText)) raiseAlert(alertText);
+    }
+
     // Week 4: statistics
     if (d.ruleId.size() == 2 && d.ruleId[1] >= '1' && d.ruleId[1] <= '7') ruleHits[d.ruleId[1] - '1']++;
     if (p.isAttack && p.attackType >= 1 && p.attackType <= 6) {
@@ -134,6 +161,7 @@ void Network::onReachFirewall(Packet& p) {
             p.state = BLOCKED;
             p.timer = 0.8f;          // stays visible for a moment, then disappears
             blockedCount++;
+            effects.push_back({p.x, p.y, 0.0f});     // Week 5: block ring
             threatLevel += 1.0f;
             word = "BLOCK"; r = 1.0f; g = 0.25f; b = 0.25f;
             break;
@@ -182,7 +210,18 @@ void Network::update(float dt) {
             p.x += dx / dist * step;
             p.y += dy / dist * step;
         }
+
+        // Week 5: remember positions for the tail
+        p.trail.push_back({p.x, p.y});
+        if (p.trail.size() > 10) p.trail.erase(p.trail.begin());
     }
+
+    for (auto& a : alerts)  a.timeLeft -= dt;
+    alerts.erase(std::remove_if(alerts.begin(), alerts.end(),
+                 [](const Alert& a) { return a.timeLeft <= 0; }), alerts.end());
+    for (auto& e : effects) e.t += dt;
+    effects.erase(std::remove_if(effects.begin(), effects.end(),
+                  [](const Effect& e) { return e.t > 0.5f; }), effects.end());
 
     // keep the inspector's copy in sync with the live packet
     if (hasSelected && !selectedGone) {
@@ -237,6 +276,14 @@ void Network::drawPacket(const Packet& p) const {
             if (p.isAttack) { r = 1.0f; g = 0.55f; b = 0.1f; }   // suspicious
             else            { r = 0.3f; g = 0.7f;  b = 1.0f; }   // normal
     }
+    // Week 5: fading tail (older positions are darker)
+    size_t n = p.trail.size();
+    for (size_t i = 0; i < n; i++) {
+        float f = 0.12f + 0.45f * (float)i / (float)n;
+        Renderer::setColor(r * f, g * f, b * f);
+        Renderer::rectFilled((int)p.trail[i].first, (int)p.trail[i].second, 2, 2);
+    }
+
     Renderer::setColor(r, g, b);
     Renderer::rectFilled((int)p.x, (int)p.y, half, half);
 
@@ -256,6 +303,13 @@ void Network::draw() const {
     }
     for (const auto& n : nodes) drawNode(n);
     for (const auto& p : packets) drawPacket(p);
+
+    for (const auto& e : effects) {         // Week 5: block rings (midpoint circle)
+        float f = 1.0f - e.t / 0.5f;
+        Renderer::setColor(1.0f * f, 0.25f * f, 0.25f * f);
+        Renderer::circleMidpoint((int)e.x, (int)e.y, 8 + (int)(e.t * 80));
+        Renderer::circleMidpoint((int)e.x, (int)e.y, 4 + (int)(e.t * 40));
+    }
 
     if (hasSelected && !selectedGone) {     // selection ring
         Renderer::setColor(1, 1, 1);
@@ -289,7 +343,8 @@ bool Network::saveLog(const std::string& path) {
     out << "Inspected    : " << totalPackets << "\n";
     out << "Allowed      : " << allowedCount << "\n";
     out << "Blocked      : " << blockedCount << "\n";
-    out << "Rate-limited : " << rateLimitedCount << "\n\n";
+    out << "Rate-limited : " << rateLimitedCount << "\n";
+    out << "IDS alerts   : " << alertCount << "\n\n";
 
     out << "== Rule hits ==\n";
     for (int i = 0; i < 7; i++)

@@ -38,6 +38,12 @@ public:
     const Rule* findRule(const std::string& id) const;
     Decision inspect(const Packet& p, float now);
 
+    // Week 5: limit editor (arrow keys)
+    static constexpr int PARAM_COUNT = 5;
+    const char* paramName(int i) const;
+    std::string paramText(int i) const;
+    void paramAdjust(int i, int dir);          // dir = -1 or +1
+
 private:
     struct SrcInfo {
         int count = 0;

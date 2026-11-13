@@ -140,3 +140,31 @@ bool Firewall::loadConfig(const std::string& path) {
     }
     return true;
 }
+
+// ---------- Week 5: limit editor ----------
+const char* Firewall::paramName(int i) const {
+    static const char* names[PARAM_COUNT] = {
+        "Max packet size", "Rate limit/window", "Strikes to ban", "Ban seconds", "Max failed logins"};
+    return (i >= 0 && i < PARAM_COUNT) ? names[i] : "";
+}
+
+std::string Firewall::paramText(int i) const {
+    switch (i) {
+        case 0: return std::to_string(maxSize);
+        case 1: return std::to_string(rateLimitN);
+        case 2: return std::to_string(banStrikes);
+        case 3: return std::to_string((int)banSeconds);
+        case 4: return std::to_string(maxFailedLogins);
+    }
+    return "";
+}
+
+void Firewall::paramAdjust(int i, int dir) {
+    switch (i) {
+        case 0: maxSize = std::max(100, std::min(9000, maxSize + dir * 100)); break;
+        case 1: rateLimitN = std::max(1, std::min(30, rateLimitN + dir)); break;
+        case 2: banStrikes = std::max(1, std::min(20, banStrikes + dir)); break;
+        case 3: banSeconds = std::max(1.0f, std::min(60.0f, banSeconds + dir)); break;
+        case 4: maxFailedLogins = std::max(1, std::min(10, maxFailedLogins + dir)); break;
+    }
+}

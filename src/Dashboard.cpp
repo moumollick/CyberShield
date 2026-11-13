@@ -1,7 +1,8 @@
- // Dashboard.cpp
+// Dashboard.cpp
 #include "Dashboard.h"
 #include "Renderer.h"
 #include <cstdio>
+#include <cmath>
 #include <string>
 
 namespace {
@@ -125,6 +126,18 @@ void Dashboard::draw(const Network& net, const AttackGenerator& atk) {
     }
     y -= 14;
 
+    // Week 5: limit editor
+    text(x, y, 1, 1, 1, "LIMITS  (arrow keys)");
+    y -= 17;
+    for (int i = 0; i < Firewall::PARAM_COUNT; i++) {
+        std::snprintf(buf, sizeof(buf), "%s %-18s %s", i == net.editParam ? ">" : " ",
+                      net.firewall.paramName(i), net.firewall.paramText(i).c_str());
+        if (i == net.editParam) text(x, y, 1.0f, 0.85f, 0.2f, buf);
+        else                    text(x, y, 0.6f, 0.7f, 0.9f, buf);
+        y -= 16;
+    }
+    y -= 14;
+
     // event log (newest first)
     text(x, y, 1, 1, 1, "EVENT LOG");
     y -= 18;
@@ -197,6 +210,10 @@ void Dashboard::drawSummary(const Network& net) {
     if (!any) { text(x, y, 0.6f, 0.6f, 0.6f, "No attacks yet (press D for the demo)"); y -= 16; }
     y -= 12;
 
+    std::snprintf(buf, sizeof(buf), "IDS alerts raised: %d", net.alertCount);
+    text(x, y, 1.0f, 0.5f, 1.0f, buf);
+    y -= 18;
+
     int best = net.mostTriggeredRule();
     if (best >= 0) {
         std::snprintf(buf, sizeof(buf), "Most triggered rule: %s - %s (%d hits)",
@@ -204,4 +221,51 @@ void Dashboard::drawSummary(const Network& net) {
                       net.ruleHits[best]);
         text(x, y, 1, 0.8f, 0.2f, buf);
     }
+}
+
+// Week 5: overlay = critical border flash, IDS alert popups, threat gauge
+void Dashboard::drawOverlay(const Network& net) {
+    // 1) red border flash when the status is CRITICAL
+    if (net.status() == STATUS_CRITICAL && std::fmod(net.simTime, 0.8f) < 0.4f) {
+        Renderer::setColor(1.0f, 0.15f, 0.15f);
+        for (int k = 0; k < 4; k++)
+            Renderer::rectOutline(640, 350, 638 - k, 348 - k);
+    }
+
+    // 2) IDS alert popups (top middle of the simulation area)
+    int row = 0;
+    for (const auto& a : net.alerts) {
+        float f = a.timeLeft < 1.0f ? a.timeLeft : 1.0f;      // fade out in the last second
+        int cy = 600 - row * 30;
+        Renderer::setColor(0.25f * f, 0.05f * f, 0.25f * f);
+        Renderer::rectFilled(570, cy, 150, 12);
+        Renderer::setColor(1.0f * f, 0.4f * f, 1.0f * f);
+        Renderer::rectOutline(570, cy, 150, 12);
+        std::string s = "ALERT: " + a.text;
+        if (s.size() > 34) s = s.substr(0, 34);
+        Renderer::drawText(425, cy - 4, s.c_str());
+        row++;
+    }
+
+    // 3) threat gauge (half circle made of ticks + needle)
+    const int gx = 760, gy = 75, R = 40;
+    float v = net.threatLevel / 10.0f;
+    if (v > 1.0f) v = 1.0f;
+    const float PI = 3.14159265f;
+    for (int k = 0; k <= 18; k++) {
+        float frac = k / 18.0f;
+        float ang = PI - PI * frac;
+        float r = 0.2f, g = 0.9f, b = 0.3f;
+        if (frac >= 0.8f)      { r = 1.0f; g = 0.2f; b = 0.2f; }
+        else if (frac >= 0.25f){ r = 1.0f; g = 0.85f; b = 0.1f; }
+        float dim = (frac <= v) ? 1.0f : 0.3f;
+        Renderer::setColor(r * dim, g * dim, b * dim);
+        Renderer::lineBresenham(gx + (int)(std::cos(ang) * (R - 9)), gy + (int)(std::sin(ang) * (R - 9)),
+                                gx + (int)(std::cos(ang) * R),       gy + (int)(std::sin(ang) * R));
+    }
+    float na = PI - PI * v;
+    Renderer::setColor(1, 1, 1);
+    Renderer::lineBresenham(gx, gy, gx + (int)(std::cos(na) * (R - 14)), gy + (int)(std::sin(na) * (R - 14)));
+    Renderer::circleMidpoint(gx, gy, 4);
+    Renderer::drawText(gx - 24, gy - 22, "THREAT LEVEL");
 }

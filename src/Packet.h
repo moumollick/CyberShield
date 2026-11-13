@@ -1,7 +1,8 @@
- // Packet.h - UPDATED for Week 4
+// Packet.h - UPDATED for Week 5
 #pragma once
 #include <string>
 #include <vector>
+#include <utility>
 
 enum PacketState { MOVING, ALLOWED, BLOCKED, RATE_LIMITED, DONE };
 
@@ -29,4 +30,5 @@ struct Packet {
     int pathIdx = 0;
     PacketState state = MOVING;
     float timer = 0;           // fade-out timer for blocked packets
+    std::vector<std::pair<float,float>> trail;   // Week 5: last positions (drawn as a fading tail)
 };

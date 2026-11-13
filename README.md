@@ -1,4 +1,4 @@
-# CyberShield# CyberShield
+# CyberShield
 
 A small firewall / network-security simulation written in C++ with OpenGL (freeglut).
 Normal and attack packets travel from client PCs through a firewall to a DMZ web server
@@ -12,7 +12,7 @@ or the internal database. The firewall inspects each packet and allows, rate-lim
 ## Build and run
 Run from the project folder (so `config/firewall.cfg` is found):
 
-    g++ -std=c++17 src/main.cpp src/Renderer.cpp src/Network.cpp src/Firewall.cpp src/AttackGenerator.cpp src/Dashboard.cpp -o CyberShield.exe -lfreeglut -lopengl32 -lglu32
+    g++ -std=c++17 src/main.cpp src/Renderer.cpp src/Network.cpp src/Firewall.cpp src/AttackGenerator.cpp src/Dashboard.cpp src/IDS.cpp -o CyberShield.exe -lfreeglut -lopengl32 -lglu32
     .\CyberShield.exe
 
 If the project has more .cpp files (for example `src/Challenge.cpp`), add them to the command.
@@ -27,6 +27,7 @@ If the project has more .cpp files (for example `src/Challenge.cpp`), add them t
 | L | save report to `logs/events.txt` (also saved on Esc) |
 | Click a packet | packet inspector (header, matched rule, threat) |
 | Click a rule or F1 - F6 | switch rule R1 - R6 on / off |
+| Arrow keys | up/down select a limit (max size, rate limit, ban time...), left/right change it |
 | Space, + / -, R, Esc | pause, speed, reset (reloads config), exit |
 
 ## Firewall rules
@@ -43,10 +44,18 @@ If the project has more .cpp files (for example `src/Challenge.cpp`), add them t
 All limits, the blacklist, ports and signatures are set in `config/firewall.cfg`.
 Edit the file and press R to reload it.
 
+## IDS (Week 5)
+The firewall decides per packet. The IDS watches behaviour over time and shows a popup alert:
+6 different ports from one source in 3 s (port scan), 12 packets in 1 s (flood),
+3 failed logins in 10 s (brute force), a payload signature, an oversized packet, a blacklisted host.
+It works even if the matching firewall rule is switched off, so you can compare detection and prevention.
+
 ## Graphics algorithms (where they are used)
 - DDA line: background grid
 - Bresenham line: network links and the X on blocked packets
-- Midpoint circle: ring around every node, selection ring around a packet
+- Midpoint circle: ring around every node, selection ring, expanding rings where packets are blocked, gauge hub
+- Bresenham also draws the threat gauge ticks and needle
+- Fading packet tail, red border flash when status is CRITICAL
 - Translation: packet movement from node to node (`Network::update`)
 
 ## Files
@@ -55,6 +64,7 @@ Edit the file and press R to reload it.
 - `Firewall.*`: rules R1 - R7, rate limiter, config loading
 - `AttackGenerator.*`: the six attacks and the demo scenario
 - `Dashboard.*`: right-side panel, packet inspector, summary screen
+- `IDS.*`: intrusion detection (port scan, flood, brute force, malware, oversized, blacklist alerts)
 - `Logger.h`: event log
 
 ## Viva notes (functions to understand)
@@ -62,4 +72,5 @@ Edit the file and press R to reload it.
 - `Network::onReachFirewall()`: runs once per packet at the firewall, applies the decision and updates counters.
 - `Network::selectAt()`: finds the packet nearest to the mouse click.
 - `Firewall::loadConfig()`: reads `key = value` lines from the config file.
+- `IDS::observe()`: keeps per-source history and raises an alert when a pattern is found.
 - `Network::saveLog()`: writes statistics and the full event log to a text file.
